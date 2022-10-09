@@ -1,0 +1,343 @@
+---
+title: "Project2"
+author: "Yuli Yin"
+date: "10/7/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+packages.used=c("shiny","tidyverse","dplyr","ggplot2")
+
+# check packages that need to be installed.
+packages.needed=setdiff(packages.used, 
+                        intersect(installed.packages()[,1], 
+                        packages.used))
+
+# install additional packages
+if(length(packages.needed)>0){
+  install.packages(packages.needed, dependencies = TRUE)
+}
+
+# load packages
+library(shiny)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+# Import the datasets 
+electric <- read.csv('../data/Electric_Consumption_And_Cost__2010_-_Feb_2022_.csv')
+water <- read.csv('../data/Water_Consumption_And_Cost__2013_-_Feb_2022_.csv')
+gas <- read.csv('../data/Heating_Gas_Consumption_And_Cost__2010_-__Feb_2022_.csv')
+```
+
+```{r}
+# Select data from 2019-2022
+electric$Revenue.Year <- as.integer(substr(electric$Revenue.Month,1,4))
+water$Revenue.Year <- as.integer(substr(water$Revenue.Month,1,4))
+gas$Revenue.Year <- as.integer(substr(gas$Revenue.Month,1,4))
+
+electric <- electric[electric$Revenue.Year>=2019,]
+water <- water[water$Revenue.Year>=2019,]
+gas <- gas[gas$Revenue.Year>=2019,]
+```
+
+```{r}
+# Select key columns from original datasets
+electric <- electric[,c('Borough','Revenue.Month','Consumption..KWH.')]
+water <- water[,c('Borough','Revenue.Month','Consumption..HCF.')]
+gas <- gas[,c('Borough','Revenue.Month','Consumption..Therms.')]
+```
+
+```{r}
+# Sort data
+electric <- electric[order(electric$Borough,electric$Revenue.Month),]
+water <- water[order(water$Borough,water$Revenue.Month),]
+gas <- gas[order(gas$Borough,gas$Revenue.Month),]
+```
+
+```{r}
+# Group by Borough and date, take average 
+electric_groupby <- electric %>% 
+                      group_by(Borough,Revenue.Month) %>% 
+                      summarise_at(vars(Consumption..KWH.), list(name = mean))
+
+water_groupby <- water %>% 
+                  group_by(Borough,Revenue.Month) %>% 
+                  summarise_at(vars(Consumption..HCF.), list(name = mean))
+
+gas_groupby <- gas %>% 
+                group_by(Borough,Revenue.Month) %>% 
+                summarise_at(vars(Consumption..Therms.), list(name = mean))
+```
+
+```{r}
+# Merge three energy
+electric_groupby$Energy <-  'Electric'
+water_groupby$Energy <- 'Water'
+gas_groupby$Energy <- 'Heating.Gas'
+gas_groupby <- gas_groupby[gas_groupby$Revenue.Month!='2022-04',]
+energy <- rbind(electric_groupby,water_groupby,gas_groupby)
+colnames(energy)[3] <- 'Avg.Consumption'
+```
+
+```{r}
+# Plots: trend over the years
+# Select by borough name, energy type
+# Test 1: Borough = BRONX, Energy = Water
+test_data1 <- energy %>% filter((Borough == "BRONX")&(Energy == 'Water'))
+ggplot(data=test_data1, aes(x=Revenue.Month, y=Avg.Consumption, group=1)) +
+  geom_line(color = "#0099f9", size = 0.5)+
+  geom_point(color = "#0099f9", size = 1) +
+  xlab("Date") + 
+  ylab("Average Consumption (KWH)") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+```
+
+```{r}
+# Test 2: Borough = BRONX, Energy = All
+test_data2 <- energy %>% filter(Borough == "BRONX")
+
+test_plot2 <- ggplot(data = test_data2[(test_data2$Energy == 'Electric') | 
+                                       (test_data2$Energy == 'Heating.Gas'),],
+                     aes(x=Revenue.Month, y=Avg.Consumption, group =Energy)) +
+              geom_line(aes(color = Energy)) +
+              geom_line(data = test_data2[test_data2$Energy == 'Water',],
+                        aes(x=Revenue.Month, y=Avg.Consumption*100, group=1, color = Energy)) +
+              scale_y_continuous(name = 'Consumption (Electric, Heating Gas)',
+                                 sec.axis = sec_axis(trans=~.*0.01,name='Consumption (Water)')) +
+              xlab("Date") + 
+              ylab("Average Consumption") +
+              theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+              scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+              theme(legend.position = "bottom")
+
+test_plot2
+```
+
+```{r}
+# Test 3: Borough = All, Energy = All
+test_data3 <- energy %>% 
+                group_by(Revenue.Month, Energy) %>% 
+                summarise_at(vars(Avg.Consumption), list(name = mean))
+colnames(test_data3)[3] <- 'Avg.Consumption'
+
+test_plot3 <- ggplot(data = test_data3[(test_data3$Energy == 'Electric') | 
+                                       (test_data3$Energy == 'Heating.Gas'),],
+                     aes(x=Revenue.Month, y=Avg.Consumption, group =Energy)) +
+              geom_line(aes(color = Energy)) +
+              geom_line(data = test_data3[test_data3$Energy == 'Water',],
+                        aes(x=Revenue.Month, y=Avg.Consumption*100, group=1, color = Energy)) +
+              scale_y_continuous(name = 'Consumption (Electric, Heating Gas)',
+                                 sec.axis = sec_axis(trans=~.*0.01,name='Consumption (Water)')) +
+              xlab("Date") + 
+              ylab("Average Consumption") +
+              theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+              scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+              theme(legend.position = "bottom")
+
+test_plot3
+```
+
+```{r}
+# Test 4: Borough = All, Energy = Water
+test_data4 <- energy %>% 
+                filter(Energy == 'Water') %>%
+                group_by(Revenue.Month) %>% 
+                summarise_at(vars(Avg.Consumption), list(name = mean))
+colnames(test_data4)[2] <- 'Avg.Consumption'
+
+ggplot(data=test_data4, aes(x=Revenue.Month, y=Avg.Consumption, group=1)) +
+  geom_line(color = "#0099f9", size = 0.5)+
+  geom_point(color = "#0099f9", size = 1) +
+  xlab("Date") + 
+  ylab("Average Consumption (KWH)") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+```
+
+```{r}
+# Define UI ----
+ui <- fluidPage(
+  # App title ----
+  titlePanel("Energy Consumption Trend"),
+  # Sidebar layout with input and output definitions ----
+  sidebarLayout(
+    # Sidebar panel for inputs ----
+    sidebarPanel(
+      # Input: Select for the borough ----
+      selectInput(inputId = "Borough",
+                  label = "Choose a borough:",
+                  choices = c("Manhattan", "Bronx", "Brooklyn", "Queens", 
+                              "Staten Island", "FHA", "Non Development Facility", "All")),
+      
+      # Input: Select for the enegry type ----
+      selectInput(inputId = "Energy",
+                  label = "Choose an energy type:",
+                  choices = c("Water", "Electric", "Heating Gas", "All"))
+    ),
+    # Main panel for displaying output ----
+    mainPanel(
+      # Output: trend of consumption over the years ----
+      plotOutput(outputId = "tsPlot")
+    )
+  )
+)
+```
+
+```{r}
+# Define server ----
+server <- function(input, output) {
+
+  energy_data <- reactive({
+    # Energy = water
+    if ("Manhattan" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "MANHATTAN" & Energy == 'Water'))
+    }
+    if ("Bronx" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BRONX" & Energy == 'Water'))
+    }
+    if ("Brooklyn" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BROOKLYN" & Energy == 'Water'))
+    }
+    if ("Queens" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "QUEENS" & Energy == 'Water'))
+    }
+    if ("Staten Island" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "STATEN ISLAND" & Energy == 'Water'))
+    }
+    if ("FHA" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "FHA" & Energy == 'Water'))
+    }
+    if ("Non Development Facility" %in% input$Borough & "Water" %in% input$Energy) {
+      return(energy %>% filter(Borough == "NON DEVELOPMENT FACILITY" & Energy == 'Water'))
+    }
+    if ("All" %in% input$Borough & "Water" %in% input$Energy) {
+      data <- energy %>% filter(Energy == 'Water') %>% group_by(Revenue.Month) %>% 
+               summarise_at(vars(Avg.Consumption), list(name = mean))
+      colnames(data)[2] <- 'Avg.Consumption'
+      return(data)
+    }
+    # Energy = Electric
+    if ("Manhattan" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "MANHATTAN" & Energy == 'Electric'))
+    }
+    if ("Bronx" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BRONX" & Energy == 'Electric'))
+    }
+    if ("Brooklyn" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BROOKLYN" & Energy == 'Electric'))
+    }
+    if ("Queens" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "QUEENS" & Energy == 'Electric'))
+    }
+    if ("Staten Island" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "STATEN ISLAND" & Energy == 'Electric'))
+    }
+    if ("FHA" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "FHA" & Energy == 'Electric'))
+    }
+    if ("Non Development Facility" %in% input$Borough & "Electric" %in% input$Energy) {
+      return(energy %>% filter(Borough == "NON DEVELOPMENT FACILITY" & Energy == 'Electric'))
+    }
+    if ("All" %in% input$Borough & "Electric" %in% input$Energy) {
+      data <- energy %>% filter(Energy == 'Electric') %>% group_by(Revenue.Month) %>% 
+               summarise_at(vars(Avg.Consumption), list(name = mean))
+      colnames(data)[2] <- 'Avg.Consumption'
+      return(data)
+    }
+    # Energy = Heating Gas
+    if ("Manhattan" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "MANHATTAN" & Energy == 'Heating.Gas'))
+    }
+    if ("Bronx" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BRONX" & Energy == 'Heating.Gas'))
+    }
+    if ("Brooklyn" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BROOKLYN" & Energy == 'Heating.Gas'))
+    }
+    if ("Queens" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "QUEENS" & Energy == 'Heating.Gas'))
+    }
+    if ("Staten Island" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "STATEN ISLAND" & Energy == 'Heating.Gas'))
+    }
+    if ("FHA" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "FHA" & Energy == 'Heating.Gas'))
+    }
+    if ("Non Development Facility" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      return(energy %>% filter(Borough == "NON DEVELOPMENT FACILITY" & Energy == 'Heating.Gas'))
+    }
+    if ("All" %in% input$Borough & "Heating Gas" %in% input$Energy) {
+      data <- energy %>% filter(Energy == 'Heating.Gas') %>% group_by(Revenue.Month) %>% 
+               summarise_at(vars(Avg.Consumption), list(name = mean))
+      colnames(data)[2] <- 'Avg.Consumption'
+      return(data)
+    }    
+    # Energy = All
+    if ("Manhattan" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "MANHATTAN"))
+    }
+    if ("Bronx" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BRONX"))
+    }
+    if ("Brooklyn" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "BROOKLYN"))
+    }
+    if ("Queens" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "QUEENS"))
+    }
+    if ("Staten Island" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "STATEN ISLAND"))
+    }
+    if ("FHA" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "FHA"))
+    }
+    if ("Non Development Facility" %in% input$Borough & "All" %in% input$Energy) {
+      return(energy %>% filter(Borough == "NON DEVELOPMENT FACILITY"))
+    }
+    if ("All" %in% input$Borough & "All" %in% input$Energy) {
+      data <- energy %>% group_by(Revenue.Month, Energy) %>% 
+               summarise_at(vars(Avg.Consumption), list(name = mean))
+      colnames(data)[3] <- 'Avg.Consumption'
+      return(data)
+    }     
+  })
+
+  output$tsPlot <-renderPlot({
+    dat = energy_data()
+    if (input$Energy != 'All') {
+      p <- ggplot(data=dat, aes(x=Revenue.Month, y=Avg.Consumption, group=1)) +
+            geom_line(color = "#0099f9", size = 0.5)+
+            geom_point(color = "#0099f9", size = 1) +
+            xlab("Date") + 
+            ylab("Average Consumption") +
+            theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+            scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+    }
+    if (input$Energy == 'All') {
+      p <- ggplot(data=dat[(dat$Energy=='Electric')|(dat$Energy=='Heating.Gas'),],
+             aes(x=Revenue.Month, y=Avg.Consumption, group=Energy)) +
+            geom_line(aes(color = Energy)) +
+            geom_line(data=dat[dat$Energy == 'Water',],
+                      aes(x=Revenue.Month, y=Avg.Consumption*10, group=1, color = Energy)) +
+            scale_y_continuous(name = 'Average Consumption (Electric, Heating Gas)',
+                               sec.axis = sec_axis(trans=~.*0.1,name='Average Consumption (Water)')) +
+            xlab("Date") + 
+            theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+            scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
+            theme(legend.position = "bottom")
+    }
+    p
+  })
+}
+
+shinyApp(ui, server)
+```
+
