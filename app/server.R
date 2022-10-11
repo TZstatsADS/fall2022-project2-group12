@@ -241,4 +241,74 @@ shinyServer(function(input, output) {
       scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y")
     
   })
+  #-----comparison, by Yudan-------#
+  # modified comparison dataset ----
+  Locations_data <- reactive({
+    
+    # energy & date selection ----
+    ##  water ----
+    if ("Water" %in% input$Energy) {
+      return(test %>% filter(Revenue.Month == input$date & Energy == 'Water'))
+    }
+    
+    ## electric ----
+    if ("Electric" %in% input$Energy) {
+      return(test %>% filter(Revenue.Month == input$date & Energy == 'Electric'))
+    }
+    
+    ## heating&gas ----
+    if ( "Heating Gas" %in% input$Energy) {
+      return(test %>% filter(Revenue.Month == input$date & Energy == 'Heating.Gas'))
+    }
+  })
+  
+  # mapPlot ----
+  output$mapPlot <-renderLeaflet({
+    
+    dat = Locations_data()
+    dat <- st_as_sf(dat, crs = st_crs(4326)) # convert data object 
+    
+    pal <- colorBin("YlOrRd", 5, domain = dat$Avg.Consumption )
+    labels <- sprintf("<strong>%s</strong><br/>%g", dat$Borough, dat$Avg.Consumption) %>% 
+      lapply(htmltools::HTML)
+    
+    map_energy <- leaflet(dat) %>%
+      setView(lng = -73.97, lat = 40.78, zoom = 10) %>%
+      addProviderTiles(provider = 'CartoDB.Positron') %>%
+      addPolygons(
+        label = labels,
+        color = "white",
+        dashArray = "3",
+        smoothFactor = 0.5,
+        opacity = 1,
+        fillOpacity = 0.7,
+        fillColor = ~pal(Avg.Consumption),
+        highlightOptions = highlightOptions(weight = 5,
+                                            fillOpacity = 0.7,
+                                            color = "#666",
+                                            opacity = 1,
+                                            bringToFront = TRUE)) %>%
+      addLegend(pal = pal, 
+                values = ~Avg.Consumption, 
+                title = 'Avg.Consumption',
+                opacity = 0.7, 
+                position = "bottomright")
+    map_energy
+  })
+  
+  # barPlot ----
+  output$barPlot <-renderPlot({
+    dat = Locations_data()
+    bar_covid <- ggplot(data = dat, aes(x = reorder(Borough, -covid_case_count), y = covid_case_count)) +
+      geom_bar(aes(fill = covid_case_count), stat = "identity") +
+      scale_fill_gradient(low = "yellow", high = '#DC143C' ) + 
+      geom_text(aes(label = covid_case_count), color = "black", vjust = 1.6, size = 8) +
+      labs(x = "Borough", y = "Covid case count") + 
+      theme(legend.position="bottom") +
+      theme_minimal()
+    bar_covid
+  })
+  
+  #---------- #
+  
 })

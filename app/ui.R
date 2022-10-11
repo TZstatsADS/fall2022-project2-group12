@@ -125,8 +125,41 @@ body <- dashboardBody(
                 )
               )
             )
-            )
-    #-----#
+            ),
+    #------------------ Comparison of covid cases & energy trend ----------------------------
+    tabItem(tabName = "Comparison",
+      fluidPage(
+      # app title 
+      titlePanel("Energy Consumption vs. Covid Trend by Borough in NYC"),
+      sidebarLayout(
+        sidebarPanel(
+          h5('Based on the Census 2020, the popolation for the 5 boroughs of NYC 
+      (Bronx, Brooklyn, Manhattan, Queens, Staten Island)
+      respectively are 1472654, 2736074, 1694263, 2405464, 495747 ; 
+      and the density of population (person/km^2) are 13482, 15227, 28872, 8542, 3327.'),
+          br(),
+         # select energy
+          selectInput(inputId = "Energy",
+                      label = "Choose an energy type:",
+                      choices = c("Water", "Electric", "Heating Gas")),
+          
+        # select date
+          selectInput(inputId = "date",
+                      label = "Choose an a date (by month):",
+                      choices = unique(test$Revenue.Month))
+        ),
+        # main panel for layout
+        mainPanel(
+          leafletOutput(outputId = "mapPlot"),
+          br(),
+          h3("Covid case count by borough"),
+          plotOutput(outputId = "barPlot"),
+          br()
+        )
+      )
+    )
+    ## ---------##
+    )
   )
 )
 
@@ -138,7 +171,8 @@ ui <- dashboardPage(
     menuItem("Home", tabName = "Introduction", icon = icon("introduction")),
     menuItem("Energy", tabName = "Energy", icon = icon("energy")),
     menuItem("Covid", tabName="Covid"),
-    menuItem("Antibody", tabName = "Antibody")
+    menuItem("Antibody", tabName = "Antibody"),
+    menuItem("Comparison", tabName = "Comparison")
   )),
   body 
 )
