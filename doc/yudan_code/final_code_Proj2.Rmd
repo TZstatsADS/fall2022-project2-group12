@@ -2,13 +2,10 @@
 title: "Project2"
 author: "Yudan Zhang"
 date: "10/7/2022"
-output: html_document
 runtime: shiny
+output: html_notebook
 ---
 # Set up 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ```{r message=FALSE, warning=FALSE}
 # load packages ----
@@ -23,7 +20,7 @@ library(leaflet)
 library(ggplot2)
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message = FALSE, warning=FALSE}
 # import dataset ----
 setwd("/Users/zhangyudan/Documents/Github/fall2022-project2-group12/data")
 electric <- read.csv('Electric_Consumption_And_Cost__2010_-_Feb_2022_.csv')
@@ -101,7 +98,7 @@ test <- na.omit(test)
 # combine covid ----
 test <- merge(test, covid, by.x=c("Borough", "Revenue.Month"), by.y=c("Borough", "lubridate"))
 # export final dataset for future use
-saveRDS(test, "final_dataset.rds")
+# saveRDS(test, "final_dataset.rds")
 class(test)
 head(test)
 ```
@@ -148,11 +145,13 @@ map_energy <- leaflet(map_data) %>%
             opacity = 0.7, 
             position = "bottomright")
 map_energy
+
+# htmlwidgets::saveWidget(map_energy, file="../figs/map_energy.html") # save plot
 ```
 
 
 ## Covid barplot
-```{r}
+```{r echo=TRUE}
 bar_data <- test[test$Revenue.Month == select_date, c('Borough', 'Revenue.Month' ,'covid_case_count')]
 
 bar_covid <- ggplot(data = bar_data, aes(x = reorder(Borough, -covid_case_count), y = covid_case_count)) +
@@ -163,7 +162,9 @@ bar_covid <- ggplot(data = bar_data, aes(x = reorder(Borough, -covid_case_count)
   labs(x = "Borough", y = "Covid case count") + 
   theme(legend.position="bottom") +
   theme_minimal()
+
 bar_covid
+# ggsave("../figs/bar_covid.png") # save plot
 ```
 
 # Shiny app
@@ -175,6 +176,11 @@ ui <- fluidPage(
   titlePanel("Energy Consumption vs. Covid Trend by Borough in NYC"),
   sidebarLayout(
     sidebarPanel(
+      h5('Based on the Census 2020, the popolation for the 5 boroughs of NYC 
+      (Bronx, Brooklyn, Manhattan, Queens, Staten Island)
+      respectively are 1472654, 2736074, 1694263, 2405464, 495747 ; 
+      and the density of population (person/km^2) are 13482, 15227, 28872, 8542, 3327.'),
+      br(),
       # Input: Select for the borough ----
       selectInput(inputId = "Energy",
                   label = "Choose an energy type:",
