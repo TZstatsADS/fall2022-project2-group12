@@ -1,0 +1,100 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+```{r,echo = FALSE, message=FALSE, warning= FALSE}
+library(dplyr)
+library(ggplot2)
+library(shiny)
+```
+
+#Load Data
+```{r}
+df_daily_case=read.csv("COVID-19_Daily_Counts_of_Cases__Hospitalizations__and_Deaths.csv")
+```
+
+#Check for missing value
+```{r}
+sum(is.na(df_daily_case[c("CASE_COUNT","HOSPITALIZED_COUNT","DEATH_COUNT")]))
+```
+
+#convert date to date format 
+```{r}
+df_daily_case$date_of_interest<-as.Date(df_daily_case$date_of_interest,"%m/%d/%Y")
+```
+
+#Count of patients tested positive for Covid-19
+```{r}
+df_daily_case%>%
+  filter(between(date_of_interest,as.Date('2020-03-01'),as.Date('2022-07-31')))%>%
+  ggplot(data=.,aes(x=date_of_interest, y=CASE_COUNT))+
+  geom_bar(stat="identity",fill="#6baed6")+
+  theme(axis.text.x = element_text(angle=45,hjust=1), plot.title = element_text(hjust = 0.5))+
+  labs(title = "People tested positive")+
+  ylab("Number of people")+
+  scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y")
+```
+#Count of deaths among confirmed COVID-19 cases
+```{r}
+df_daily_case%>%
+  ggplot(data=.,aes(x=date_of_interest, y=DEATH_COUNT))+
+  geom_bar(stat="identity",fill="#6baed6")+
+  theme(axis.text.x = element_text(angle=45,hjust=1), plot.title = element_text(hjust = 0.5))+
+  labs(title = "Death Count")+
+  ylab("Number of people")+
+  scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y")
+```
+#Define UI
+```{r}
+ui <- fluidPage(
+  # App title 
+  titlePanel("Covid 19 STATISTIC"),
+  # Sidebar layout 
+  sidebarLayout(
+    # Sidebar panel for inputs
+    sidebarPanel(
+      # Input: Select for the health statistics
+      selectInput(inputId = "y",
+                  label = "Choose a statistics:",
+                  choices = c("Count of patients tested positive for Covid-19"="CASE_COUNT","Count of deaths among confirmed COVID-19 cases"="DEATH_COUNT","Count of COVID-19 patients who were hospitalized"="HOSPITALIZED_COUNT"),
+                  selected="Count of patients tested positive for Covid-19"),
+      selectInput(inputId = "x",
+                  label = "Date",
+                  choices = c("Date"="date_of_interest"),
+                  selected="Date"),
+    ),
+    # Main panel for displaying output 
+    mainPanel(
+      # Output: trend 
+      plotOutput(outputId = "tsPlot")
+    )
+  )
+)
+```
+
+#Define Server
+```{r}
+server <- function(input, output) {
+  output$tsPlot <-renderPlot({
+    ggplot(data=df_daily_case,aes_string(x=input$x, y=input$y))+
+      geom_bar(stat="identity",fill="#6baed6")+
+      theme(axis.text.x = element_text(angle=45,hjust=1), plot.title = element_text(hjust = 0.5))+
+      labs(title = "Covid-19 Statistics from 2020 to 2022")+
+      ylab("Count")+
+      xlab("Date")+
+      scale_x_date(date_breaks = "1 month", date_labels =  "%b %Y")
+  
+  })
+}
+```
+
+#start the app
+```{r}
+shinyApp(ui, server)
+```
+
+
+
+
