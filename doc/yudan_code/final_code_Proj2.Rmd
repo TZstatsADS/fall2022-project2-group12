@@ -1,0 +1,272 @@
+---
+title: "Project2"
+author: "Yudan Zhang"
+date: "10/7/2022"
+output: html_document
+runtime: shiny
+---
+# Set up 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+# load packages ----
+library(shiny) # for shiny app
+# for edit data set
+library(tidyverse) 
+library(dplyr)
+library(data.table)
+# for map_plot & bar_plot
+library(sf)
+library(leaflet)
+library(ggplot2)
+```
+
+```{r message=FALSE, warning=FALSE}
+# import dataset ----
+setwd("/Users/zhangyudan/Documents/Github/fall2022-project2-group12/data")
+electric <- read.csv('Electric_Consumption_And_Cost__2010_-_Feb_2022_.csv')
+water <- read.csv('Water_Consumption_And_Cost__2013_-_Feb_2022_.csv')
+gas <- read.csv('Heating_Gas_Consumption_And_Cost__2010_-__Feb_2022_.csv')
+covid <- read.csv('cases-by-day.csv')
+data <- st_read("Borough_Boundaries/geo_export_a59a7c07-bd70-4b11-af9f-011b5ad2a963.shp")
+```
+
+# Clean & Edit 
+
+## Energy dataset 
+```{r message=FALSE, warning=FALSE}
+# select cols ----
+electric <- electric[,c('Borough','Revenue.Month','Consumption..KWH.')]
+water <- water[,c('Borough','Revenue.Month','Consumption..HCF.')]
+gas <- gas[,c('Borough','Revenue.Month','Consumption..Therms.')]
+
+# filter data by date ----
+electric <- subset(electric, Revenue.Month > 2019)
+water <- subset(water, Revenue.Month > 2019)
+gas <- subset(gas, Revenue.Month > 2019)
+
+# group by Borough & date to get mean(Consumption..KWH.) ----
+electric_groupby <- electric %>% 
+                      group_by(Borough,Revenue.Month) %>% 
+                      summarise_at(vars(Consumption..KWH.), list(name = mean))
+
+water_groupby <- water %>% 
+                  group_by(Borough,Revenue.Month) %>% 
+                  summarise_at(vars(Consumption..HCF.), list(name = mean))
+
+gas_groupby <- gas %>% 
+                group_by(Borough,Revenue.Month) %>% 
+                summarise_at(vars(Consumption..Therms.), list(name = mean))
+
+# combine energy dataset ----
+electric_groupby$Energy <-  'Electric'
+water_groupby$Energy <- 'Water'
+gas_groupby$Energy <- 'Heating.Gas'
+gas_groupby <- gas_groupby[gas_groupby$Revenue.Month!='2022-04',]
+energy <- rbind(electric_groupby,water_groupby,gas_groupby)
+colnames(energy)[3] <- 'Avg.Consumption'
+energy$Revenue.Month <- anytime::anydate(energy$Revenue.Month) # convert to Date
+```
+
+## Covid dataset 
+```{r}
+# clean & edit covid datset ----
+covid <- covid[,c("date_of_interest", "BX_CASE_COUNT", "BK_CASE_COUNT", "MN_CASE_COUNT","QN_CASE_COUNT","SI_CASE_COUNT")]
+
+covid$date_of_interest <- anytime::anydate(covid$date_of_interest) # convert type to Date
+
+# sum by month 
+covid <- setDT(covid)[, lapply(.SD, sum), by = lubridate::floor_date(date_of_interest, "month")]
+
+BRONX <- covid[,c('lubridate','BX_CASE_COUNT')] %>% rename('covid_case_count' = 'BX_CASE_COUNT') %>% mutate('Borough' = 'BRONX')
+BROOKLYN <- covid[,c('lubridate','BK_CASE_COUNT')] %>% rename('covid_case_count' = 'BK_CASE_COUNT') %>% mutate('Borough' = 'BROOKLYN')
+MANHATTAN <- covid[,c('lubridate','MN_CASE_COUNT')] %>% rename('covid_case_count' = 'MN_CASE_COUNT') %>% mutate('Borough' = 'MANHATTAN')
+QUEENS <- covid[,c('lubridate','QN_CASE_COUNT')] %>% rename('covid_case_count' = 'QN_CASE_COUNT') %>% mutate('Borough' = 'QUEENS')
+STATEN_ISLAND <- covid[,c('lubridate','SI_CASE_COUNT')] %>% rename('covid_case_count' = 'SI_CASE_COUNT') %>% mutate('Borough' = 'STATEN ISLAND')
+
+# combine all boroughs 
+covid <- do.call("rbind", list(BRONX, BROOKLYN, MANHATTAN, QUEENS, STATEN_ISLAND))
+```
+
+## Location Info.
+```{r}
+# combine location info.----
+data <- data %>% rename('Borough' = 'boroname')
+data$Borough <-  toupper(data$Borough)
+test <- merge(energy, data, by='Borough') 
+test <- na.omit(test)
+
+# combine covid ----
+test <- merge(test, covid, by.x=c("Borough", "Revenue.Month"), by.y=c("Borough", "lubridate"))
+# export final dataset for future use
+saveRDS(test, "final_dataset.rds")
+class(test)
+head(test)
+```
+
+# Plots
+
+## Energy map plot 
+```{r}
+# map plot ----
+# if not set energy type, go with the last value fo that day by borough
+select_date = '2021-02-01'
+select_energy = 'Water'
+
+map_data = test[test$Revenue.Month == select_date & test$Energy == select_energy, c('Borough', 'Revenue.Month','Energy','Avg.Consumption','geometry')]
+
+map_data <- st_as_sf(map_data,crs = st_crs(4326)) # convert data type for map plot
+
+pal <- colorBin("YlOrRd",5, domain = map_data$Avg.Consumption ) # max = 9, set 5 for 5 boroughs in nyc
+
+labels <- sprintf(
+  "<strong>%s</strong><br/>%g",
+  map_data$Borough, map_data$Avg.Consumption) %>% 
+  lapply(htmltools::HTML)
+
+map_energy <- leaflet(map_data) %>%
+  setView(lng = -73.97, lat = 40.78, zoom = 10) %>%
+  addProviderTiles(provider = 'CartoDB.Positron') %>%
+  addPolygons(
+    label = labels,
+    color = "white",
+    dashArray = "3",
+    smoothFactor = 0.5,
+    opacity = 1,
+    fillOpacity = 0.7,
+    fillColor = ~pal(Avg.Consumption),
+    highlightOptions = highlightOptions(weight = 5,
+                                        fillOpacity = 0.7,
+                                        color = "#666",
+                                        opacity = 1,
+                                        bringToFront = TRUE)) %>%
+  addLegend(pal = pal, 
+            values = ~Avg.Consumption, 
+            title = 'Avg.Consumption',
+            opacity = 0.7, 
+            position = "bottomright")
+map_energy
+```
+
+
+## Covid barplot
+```{r}
+bar_data <- test[test$Revenue.Month == select_date, c('Borough', 'Revenue.Month' ,'covid_case_count')]
+
+bar_covid <- ggplot(data = bar_data, aes(x = reorder(Borough, -covid_case_count), y = covid_case_count)) +
+  geom_bar(aes(fill = covid_case_count), stat = "identity") +
+  scale_fill_gradient(low = "yellow", high = '#DC143C' ) + 
+  geom_text(aes(label = covid_case_count), color = "black", vjust = 1.6, size = 4) +
+  ggtitle("Covid case count by borough") + 
+  labs(x = "Borough", y = "Covid case count") + 
+  theme(legend.position="bottom") +
+  theme_minimal()
+bar_covid
+```
+
+# Shiny app
+```{r}
+test <- readRDS("final_dataset.rds")
+# ui ----
+ui <- fluidPage(
+  # app title ----
+  titlePanel("Energy Consumption vs. Covid Trend by Borough in NYC"),
+  sidebarLayout(
+    sidebarPanel(
+      # Input: Select for the borough ----
+      selectInput(inputId = "Energy",
+                  label = "Choose an energy type:",
+                  choices = c("Water", "Electric", "Heating Gas")),
+      
+      # Input: Select for the enegry type ----
+      selectInput(inputId = "date",
+                  label = "Choose an a date (by month):",
+                  choices = unique(test$Revenue.Month))
+    ),
+    # Main panel for displaying output ----
+    mainPanel(
+      leafletOutput(outputId = "mapPlot"),
+      br(),
+      h3("Covid case count by borough"),
+      plotOutput(outputId = "barPlot"),
+      br()
+    )
+  )
+)
+
+
+# server ----
+server <- function(input, output) {
+  
+# modified dataset ----
+  Locations_data <- reactive({
+  
+    # energy & date selection ----
+    ##  water ----
+    if ("Water" %in% input$Energy) {
+      return(test %>% filter(Revenue.Month == input$date & Energy == 'Water'))
+    }
+
+    ## electric ----
+    if ("Electric" %in% input$Energy) {
+      return(test %>% filter(Revenue.Month == input$date & Energy == 'Electric'))
+    }
+    
+    ## heating&gas ----
+    if ( "Heating Gas" %in% input$Energy) {
+      return(test %>% filter(Revenue.Month == input$date & Energy == 'Heating.Gas'))
+    }
+  })
+  
+    # mapPlot ----
+  output$mapPlot <-renderLeaflet({
+  
+    dat = Locations_data()
+    dat <- st_as_sf(dat, crs = st_crs(4326)) # convert data object 
+    
+    pal <- colorBin("YlOrRd", 5, domain = dat$Avg.Consumption )
+    labels <- sprintf("<strong>%s</strong><br/>%g", dat$Borough, dat$Avg.Consumption) %>% 
+      lapply(htmltools::HTML)
+    
+    map_energy <- leaflet(dat) %>%
+  setView(lng = -73.97, lat = 40.78, zoom = 10) %>%
+  addProviderTiles(provider = 'CartoDB.Positron') %>%
+  addPolygons(
+    label = labels,
+    color = "white",
+    dashArray = "3",
+    smoothFactor = 0.5,
+    opacity = 1,
+    fillOpacity = 0.7,
+    fillColor = ~pal(Avg.Consumption),
+    highlightOptions = highlightOptions(weight = 5,
+                                        fillOpacity = 0.7,
+                                        color = "#666",
+                                        opacity = 1,
+                                        bringToFront = TRUE)) %>%
+  addLegend(pal = pal, 
+            values = ~Avg.Consumption, 
+            title = 'Avg.Consumption',
+            opacity = 0.7, 
+            position = "bottomright")
+map_energy
+  })
+  
+  # barPlot ----
+   output$barPlot <-renderPlot({
+     dat = Locations_data()
+     bar_covid <- ggplot(data = dat, aes(x = reorder(Borough, -covid_case_count), y = covid_case_count)) +
+  geom_bar(aes(fill = covid_case_count), stat = "identity") +
+  scale_fill_gradient(low = "yellow", high = '#DC143C' ) + 
+  geom_text(aes(label = covid_case_count), color = "black", vjust = 1.6, size = 8) +
+  labs(x = "Borough", y = "Covid case count") + 
+  theme(legend.position="bottom") +
+  theme_minimal()
+     bar_covid
+   })
+}
+
+shinyApp(ui, server)
+```
