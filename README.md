@@ -2,7 +2,7 @@
 
 ### [Project Description](doc/project2_desc.md)
 
-![screenshot](doc/figs/map.jpg)
+![screenshot](doc/figs/home.jpg)
 
 ## Project Title Covid 19 and Its Impact on Energy Consumption in NYC
 Term: Fall 2022
