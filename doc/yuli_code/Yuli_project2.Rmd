@@ -34,46 +34,51 @@ library(ggplot2)
 electric <- read.csv('../data/Electric_Consumption_And_Cost__2010_-_Feb_2022_.csv')
 water <- read.csv('../data/Water_Consumption_And_Cost__2013_-_Feb_2022_.csv')
 gas <- read.csv('../data/Heating_Gas_Consumption_And_Cost__2010_-__Feb_2022_.csv')
+
+# Select data from 2019-2022
+electric2 <- electric
+water2 <- water
+gas2 <- gas
 ```
 
 ```{r}
 # Select data from 2019-2022
-electric$Revenue.Year <- as.integer(substr(electric$Revenue.Month,1,4))
-water$Revenue.Year <- as.integer(substr(water$Revenue.Month,1,4))
-gas$Revenue.Year <- as.integer(substr(gas$Revenue.Month,1,4))
+electric2$Revenue.Year <- as.integer(substr(electric2$Revenue.Month,1,4))
+water2$Revenue.Year <- as.integer(substr(water2$Revenue.Month,1,4))
+gas2$Revenue.Year <- as.integer(substr(gas2$Revenue.Month,1,4))
 
-electric <- electric[electric$Revenue.Year>=2019,]
-water <- water[water$Revenue.Year>=2019,]
-gas <- gas[gas$Revenue.Year>=2019,]
+electric2 <- electric2[electric2$Revenue.Year>=2019,]
+water2 <- water2[water2$Revenue.Year>=2019,]
+gas2 <- gas2[gas2$Revenue.Year>=2019,]
 ```
 
 ```{r}
 # Select key columns from original datasets
-electric <- electric[,c('Borough','Revenue.Month','Consumption..KWH.')]
-water <- water[,c('Borough','Revenue.Month','Consumption..HCF.')]
-gas <- gas[,c('Borough','Revenue.Month','Consumption..Therms.')]
+electric2 <- electric2[,c('Borough','Revenue.Month','Consumption..KWH.')]
+water2 <- water2[,c('Borough','Revenue.Month','Consumption..HCF.')]
+gas2 <- gas2[,c('Borough','Revenue.Month','Consumption..Therms.')]
 ```
 
 ```{r}
 # Sort data
-electric <- electric[order(electric$Borough,electric$Revenue.Month),]
-water <- water[order(water$Borough,water$Revenue.Month),]
-gas <- gas[order(gas$Borough,gas$Revenue.Month),]
+electric2 <- electric2[order(electric2$Borough,electric2$Revenue.Month),]
+water2 <- water2[order(water2$Borough,water2$Revenue.Month),]
+gas2 <- gas2[order(gas2$Borough,gas2$Revenue.Month),]
 ```
 
 ```{r}
 # Group by Borough and date, take average 
-electric_groupby <- electric %>% 
+electric_groupby <- electric2 %>% 
                       group_by(Borough,Revenue.Month) %>% 
-                      summarise_at(vars(Consumption..KWH.), list(name = mean))
+                      summarise(mean=sum(Consumption..KWH.))
 
-water_groupby <- water %>% 
+water_groupby <- water2 %>% 
                   group_by(Borough,Revenue.Month) %>% 
-                  summarise_at(vars(Consumption..HCF.), list(name = mean))
+                  summarise(mean = sum(Consumption..HCF.))
 
-gas_groupby <- gas %>% 
+gas_groupby <- gas2 %>% 
                 group_by(Borough,Revenue.Month) %>% 
-                summarise_at(vars(Consumption..Therms.), list(name = mean))
+                summarise(mean = sum(Consumption..Therms.))
 ```
 
 ```{r}
@@ -83,7 +88,7 @@ water_groupby$Energy <- 'Water'
 gas_groupby$Energy <- 'Heating.Gas'
 gas_groupby <- gas_groupby[gas_groupby$Revenue.Month!='2022-04',]
 energy <- rbind(electric_groupby,water_groupby,gas_groupby)
-colnames(energy)[3] <- 'Avg.Consumption'
+colnames(energy)[3] <- 'Sum.Consumption'
 ```
 
 ```{r}
@@ -91,82 +96,87 @@ colnames(energy)[3] <- 'Avg.Consumption'
 # Select by borough name, energy type
 # Test 1: Borough = BRONX, Energy = Water
 test_data1 <- energy %>% filter((Borough == "BRONX")&(Energy == 'Water'))
-ggplot(data=test_data1, aes(x=Revenue.Month, y=Avg.Consumption, group=1)) +
+ggplot(data=test_data1, aes(x=Revenue.Month, y=Sum.Consumption, group=1)) +
   geom_line(color = "#0099f9", size = 0.5)+
-  geom_point(color = "#0099f9", size = 1) +
+  #geom_point(color = "#0099f9", size = 1) +
   xlab("Date") + 
-  ylab("Average Consumption (KWH)") +
+  ylab("Sum Consumption") +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
   scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
 ```
-
 ```{r}
 # Test 2: Borough = BRONX, Energy = All
 test_data2 <- energy %>% filter(Borough == "BRONX")
+scale_electric <- test_data2 %>% filter(Energy == 'Electric')
+scale_water <- test_data2 %>% filter(Energy == 'Water')
+scale <- mean(scale_electric$Sum.Consumption)/mean(scale_water$Sum.Consumption)
 
 test_plot2 <- ggplot(data = test_data2[(test_data2$Energy == 'Electric') | 
                                        (test_data2$Energy == 'Heating.Gas'),],
-                     aes(x=Revenue.Month, y=Avg.Consumption, group =Energy)) +
+                     aes(x=Revenue.Month, y=Sum.Consumption, group =Energy)) +
               geom_line(aes(color = Energy)) +
               geom_line(data = test_data2[test_data2$Energy == 'Water',],
-                        aes(x=Revenue.Month, y=Avg.Consumption*100, group=1, color = Energy)) +
-              scale_y_continuous(name = 'Consumption (Electric, Heating Gas)',
-                                 sec.axis = sec_axis(trans=~.*0.01,name='Consumption (Water)')) +
+                        aes(x=Revenue.Month, y=Sum.Consumption*scale, group=1, color = Energy)) +
+              scale_y_continuous(name = 'Sum Consumption (Electric, Heating Gas)',
+                                 sec.axis = sec_axis(trans=~.*(1/scale),name='Sum Consumption (Water)')) +
               xlab("Date") + 
-              ylab("Average Consumption") +
+              ylab("Sum Consumption") +
               theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
               scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
               theme(legend.position = "bottom")
 
 test_plot2
 ```
+```{r}
+# Test 3: Borough = All, Energy = Water
+test_data3 <- energy %>% 
+                filter(Energy == 'Heating.Gas') %>%
+                group_by(Revenue.Month) %>% 
+                summarise(mean=sum(Sum.Consumption))
+colnames(test_data3)[2] <- 'Sum.Consumption'
+
+ggplot(data=test_data3, aes(x=Revenue.Month, y=Sum.Consumption, group=1)) +
+  geom_line(color = "#0099f9", size = 0.5)+
+  #geom_point(color = "#0099f9", size = 1) +
+  xlab("Date") + 
+  ylab("Sum Consumption") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+```
 
 ```{r}
-# Test 3: Borough = All, Energy = All
-test_data3 <- energy %>% 
+# Test 4: Borough = All, Energy = All
+test_data4 <- energy %>% 
                 group_by(Revenue.Month, Energy) %>% 
-                summarise_at(vars(Avg.Consumption), list(name = mean))
-colnames(test_data3)[3] <- 'Avg.Consumption'
+                summarise(mean=sum(Sum.Consumption))
+colnames(test_data4)[3] <- 'Sum.Consumption'
 
-test_plot3 <- ggplot(data = test_data3[(test_data3$Energy == 'Electric') | 
-                                       (test_data3$Energy == 'Heating.Gas'),],
-                     aes(x=Revenue.Month, y=Avg.Consumption, group =Energy)) +
+scale_electric4 <- test_data4 %>% filter(Energy == 'Electric')
+scale_water4 <- test_data4 %>% filter(Energy == 'Water')
+scale4 <- mean(scale_electric4$Sum.Consumption)/mean(scale_water4$Sum.Consumption)
+
+test_plot4 <- ggplot(data = test_data4[(test_data4$Energy == 'Electric') | 
+                                       (test_data4$Energy == 'Heating.Gas'),],
+                     aes(x=Revenue.Month, y=Sum.Consumption, group =Energy)) +
               geom_line(aes(color = Energy)) +
-              geom_line(data = test_data3[test_data3$Energy == 'Water',],
-                        aes(x=Revenue.Month, y=Avg.Consumption*100, group=1, color = Energy)) +
-              scale_y_continuous(name = 'Consumption (Electric, Heating Gas)',
-                                 sec.axis = sec_axis(trans=~.*0.01,name='Consumption (Water)')) +
+              geom_line(data = test_data4[test_data4$Energy == 'Water',],
+                        aes(x=Revenue.Month, y=Sum.Consumption*scale4, group=1, color = Energy)) +
+              scale_y_continuous(name = 'Sum Consumption (Electric, Heating Gas)',
+                                 sec.axis = sec_axis(trans=~.*(1/scale4),name='Sum Consumption (Water)')) +
               xlab("Date") + 
-              ylab("Average Consumption") +
+              ylab("Sum Consumption") +
               theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
               scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
               theme(legend.position = "bottom")
 
-test_plot3
-```
-
-```{r}
-# Test 4: Borough = All, Energy = Water
-test_data4 <- energy %>% 
-                filter(Energy == 'Water') %>%
-                group_by(Revenue.Month) %>% 
-                summarise_at(vars(Avg.Consumption), list(name = mean))
-colnames(test_data4)[2] <- 'Avg.Consumption'
-
-ggplot(data=test_data4, aes(x=Revenue.Month, y=Avg.Consumption, group=1)) +
-  geom_line(color = "#0099f9", size = 0.5)+
-  geom_point(color = "#0099f9", size = 1) +
-  xlab("Date") + 
-  ylab("Average Consumption (KWH)") +
-  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+test_plot4
 ```
 
 ```{r}
 # Define UI ----
 ui <- fluidPage(
   # App title ----
-  titlePanel("Energy Consumption Trend"),
+  titlePanel("Energy Consumption Trend over the Years"),
   # Sidebar layout with input and output definitions ----
   sidebarLayout(
     # Sidebar panel for inputs ----
@@ -220,8 +230,8 @@ server <- function(input, output) {
     }
     if ("All" %in% input$Borough & "Water" %in% input$Energy) {
       data <- energy %>% filter(Energy == 'Water') %>% group_by(Revenue.Month) %>% 
-               summarise_at(vars(Avg.Consumption), list(name = mean))
-      colnames(data)[2] <- 'Avg.Consumption'
+        summarise(mean=sum(Sum.Consumption))
+      colnames(data)[2] <- 'Sum.Consumption'
       return(data)
     }
     # Energy = Electric
@@ -248,8 +258,8 @@ server <- function(input, output) {
     }
     if ("All" %in% input$Borough & "Electric" %in% input$Energy) {
       data <- energy %>% filter(Energy == 'Electric') %>% group_by(Revenue.Month) %>% 
-               summarise_at(vars(Avg.Consumption), list(name = mean))
-      colnames(data)[2] <- 'Avg.Consumption'
+        summarise(mean=sum(Sum.Consumption))
+      colnames(data)[2] <- 'Sum.Consumption'
       return(data)
     }
     # Energy = Heating Gas
@@ -276,8 +286,8 @@ server <- function(input, output) {
     }
     if ("All" %in% input$Borough & "Heating Gas" %in% input$Energy) {
       data <- energy %>% filter(Energy == 'Heating.Gas') %>% group_by(Revenue.Month) %>% 
-               summarise_at(vars(Avg.Consumption), list(name = mean))
-      colnames(data)[2] <- 'Avg.Consumption'
+        summarise(mean=sum(Sum.Consumption))
+      colnames(data)[2] <- 'Sum.Consumption'
       return(data)
     }    
     # Energy = All
@@ -304,8 +314,8 @@ server <- function(input, output) {
     }
     if ("All" %in% input$Borough & "All" %in% input$Energy) {
       data <- energy %>% group_by(Revenue.Month, Energy) %>% 
-               summarise_at(vars(Avg.Consumption), list(name = mean))
-      colnames(data)[3] <- 'Avg.Consumption'
+        summarise(mean=sum(Sum.Consumption))
+      colnames(data)[3] <- 'Sum.Consumption'
       return(data)
     }     
   })
@@ -313,22 +323,25 @@ server <- function(input, output) {
   output$tsPlot <-renderPlot({
     dat = energy_data()
     if (input$Energy != 'All') {
-      p <- ggplot(data=dat, aes(x=Revenue.Month, y=Avg.Consumption, group=1)) +
+      p <- ggplot(data=dat, aes(x=Revenue.Month, y=Sum.Consumption, group=1)) +
             geom_line(color = "#0099f9", size = 0.5)+
-            geom_point(color = "#0099f9", size = 1) +
             xlab("Date") + 
-            ylab("Average Consumption") +
+            ylab("Sum Consumption") +
             theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
             scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
     }
     if (input$Energy == 'All') {
+      scale_electric <- dat %>% filter(Energy == 'Electric')
+      scale_water <- dat %>% filter(Energy == 'Water')
+      scale <- mean(scale_electric$Sum.Consumption)/mean(scale_water$Sum.Consumption)
+      
       p <- ggplot(data=dat[(dat$Energy=='Electric')|(dat$Energy=='Heating.Gas'),],
-             aes(x=Revenue.Month, y=Avg.Consumption, group=Energy)) +
+             aes(x=Revenue.Month, y=Sum.Consumption, group=Energy)) +
             geom_line(aes(color = Energy)) +
             geom_line(data=dat[dat$Energy == 'Water',],
-                      aes(x=Revenue.Month, y=Avg.Consumption*10, group=1, color = Energy)) +
-            scale_y_continuous(name = 'Average Consumption (Electric, Heating Gas)',
-                               sec.axis = sec_axis(trans=~.*0.1,name='Average Consumption (Water)')) +
+                      aes(x=Revenue.Month, y=Sum.Consumption*scale, group=1, color = Energy)) +
+            scale_y_continuous(name = 'Sum Consumption (Electric, Heating Gas)',
+                               sec.axis = sec_axis(trans=~.*(1/scale),name='Sum Consumption (Water)')) +
             xlab("Date") + 
             theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
             scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) +
