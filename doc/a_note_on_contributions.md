@@ -1,20 +1,40 @@
 ### A Note on Contributions
 
-Whenever we have team projects, there are always concerns on unequal contributions from members of a project team. In the ideal world, we are all here to put in our best efforts and learn together. Even in that ideal world, we have different skill sets and preparations, and we will still contribute differently to a project. 
-
-Therefore, you are required to post a *contribution statement* in the root README.md of your GitHub repo. Please beware that your GitHub repo will become public and remain public after the due date of the projects. 
-
-Post your title, team members, project abstract and a contribution statement in the README.md file.  This is a common practice for research scientific journals. 
-
-Below is an example. If no contribution statement is provided, we will insert a default statement that goes "**All team members contributed equally in all stages of this project. All team members approve our work presented in this GitHub repository including this contributions statement**. "
 
 ---
 Sample project README statement.
 
-Project xxx
+Project 2 - Group 12: Energy and Covid Analysis
 
-Team members: Avi Bond, Comma Deed, En Funn, Gem Hon
+Team members: Donglai Xu, Nour Moustafa-Fahmy, Yuli Yin, Xilin Huang, Sherry Zhang
 
 Summary: In this project, we developed a new method and improved the classification accuracy for images of cats and dogs to 99.9%
 
-[Contribution Statement] AB, CD, EF and GH designed the study. AB and CD developed baseline classification model for evaluation. EF and GH explored feature engineering for improving the baseline model. AB, EF and GH discussed and designed the model evaluation protocol. CD carried out the computation for model evaluation. All team members contributed to the GitHub repository and prepared the presentation. All team members approve our work presented in our GitHub repository including this contribution statement.
+[Contribution Statement] 
+
+- Donglai:
+Coding the Covid-19 statistics part of shiny app. Discussing the topic and writing
+the conclusion with the other group members.
+
+- Xilin (Icey Huang):
+Find the possible dataset from housing agency. Come up with the idea of plotting
+electricity consumption on map and give possible output graphs from that dataset.
+By adding Yuli’s idea, adding three types of energy consumption (electricity,water
+and heating gas) map to our project. Decide the specific date range we use in our
+projectof energy consumption part. Response for the code of energyconsumption
+map of the 4th tab. Contribute the conclusion part with all the other group
+members.
+
+- Yuli:
+Led the discussion of main topic and built the framework of the project. Took
+responsibility for the energy consumption part with Xilin by investigating into the
+energy datasets, came up with the line plot idea, and drew some conclusions. Wrote
+the code and description for Tab1- Introduction and Tab 5 – Energy Yearly Trend.
+
+- Nour:
+Responsible for antibody section; heatmap of positive test percentages, yearly changes, and data table of poverty levels vs antibody rates.
+Was also responsible for extending Yuli's project framework and merging everyone's code into final project, and debugging therein.
+
+-  Yudan Zhang (Sherry):
+1. Code the comparison between 3 types of energy consumption &amp; total Covid
+cases counted by nyc’s 5 boroughs part in Shiny app. Responsible for the presentation. Organized the conclusion from each part of the Shiny app &amp; contribution in file. Provide the idea of the project outline that connects the energy consumption with Covid.
