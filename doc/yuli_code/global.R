@@ -50,20 +50,21 @@ gas2 <- gas2[order(gas2$Borough,gas2$Revenue.Month),]
 # Group by Borough and date, take average 
 electric_groupby <- electric2 %>% 
   group_by(Borough,Revenue.Month) %>% 
-  summarise_at(vars(Consumption..KWH.), list(name = mean))
+  summarise(mean=sum(Consumption..KWH.))
 
 water_groupby <- water2 %>% 
   group_by(Borough,Revenue.Month) %>% 
-  summarise_at(vars(Consumption..HCF.), list(name = mean))
+  summarise(mean = sum(Consumption..HCF.))
 
 gas_groupby <- gas2 %>% 
   group_by(Borough,Revenue.Month) %>% 
-  summarise_at(vars(Consumption..Therms.), list(name = mean))
+  summarise(mean = sum(Consumption..Therms.))
 
 # Merge three energy
 electric_groupby$Energy <-  'Electric'
 water_groupby$Energy <- 'Water'
 gas_groupby$Energy <- 'Heating.Gas'
 gas_groupby <- gas_groupby[gas_groupby$Revenue.Month!='2022-04',]
-energy <- rbind(electric_groupby,water_groupby,gas_groupby)
-colnames(energy)[3] <- 'Avg.Consumption'
+
+energy_yuli <- rbind(electric_groupby,water_groupby,gas_groupby)
+colnames(energy_yuli)[3] <- 'Sum.Consumption'
