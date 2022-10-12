@@ -32,7 +32,7 @@ energy datasets, came up with the line plot idea, and drew some conclusions. Wro
 the code and description for Tab1- Introduction and Tab 5 – Energy Yearly Trend.
 
 - *Nour:*
-Responsible for antibody section; heatmap of positive test percentages, yearly changes, and data table of poverty levels vs antibody rates.
+Responsible for antibody section; heatmap of positive test percentages, yearly changes, and data table of poverty levels vs antibody rates (the 'antibody' tab).
 Was also responsible for extending Yuli's project framework and merging everyone's code into final project, and debugging therein.
 
 -  *Yudan Zhang (Sherry):*
