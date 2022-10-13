@@ -268,7 +268,7 @@ shinyServer(function(input, output) {
                                 by zip code")),
                 position = "bottomright")
   })
-  #---Sherry---#
+  # Sherry ----
   # modified comparison dataset ----
   Locations_data_Sherry <- reactive({
     
@@ -293,15 +293,15 @@ shinyServer(function(input, output) {
   output$mapPlot_Sherry <-renderLeaflet({
     
     dat = Locations_data_Sherry()
-    dat <- st_as_sf(dat, crs = st_crs(4326)) # convert data object 
-    
     pal <- colorBin("YlOrRd", 5, domain = dat$Avg.Consumption )
     labels <- sprintf("<strong>%s</strong><br/>%g", dat$Borough, dat$Avg.Consumption) %>% 
       lapply(htmltools::HTML)
     
-    map_energy_Sherry <- leaflet(dat) %>%
-      setView(lng = -73.97, lat = 40.78, zoom = 10) %>%
+    map_energy_Sherry <- dat %>% 
+      st_transform(crs = '+init=epsg:4326') %>%
+      leaflet() %>%
       addProviderTiles(provider = 'CartoDB.Positron') %>%
+      setView(lng = -73.97, lat = 40.78, zoom = 10) %>%
       addPolygons(
         label = labels,
         color = "white",
